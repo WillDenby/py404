@@ -139,7 +139,7 @@ def main(url: str,
     """
     Find deadlinks for any given URL.
 
-    If --output or -o is used, 
+    If --save is used as an option, saves results to csv in cwd.  
     """
     previously_discovered_links = set()
     links_and_pages = {}
