@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "py404"
 version = "0.1.0"
-description = "py404 is a CLI tool for finding deadlinks on a website"
+description = "py404 is a CLI tool for finding deadlinks on a website."
 license = "MIT"
 authors = ["WillDenby <119456795+WillDenby@users.noreply.github.com>"]
 readme = "README.md"
@@ -9,6 +9,10 @@ repository = "https://github.com/WillDenby/py404"
 
 [tool.poetry.dependencies]
 python = "^3.9"
+typer = "^0.9.0"
+beautifulsoup4 = "^4.12.3"
+requests = "^2.31.0"
+aiohttp = "^3.9.3"
 
 [tool.poetry.scripts]
 py404 = "py404.main:app"
