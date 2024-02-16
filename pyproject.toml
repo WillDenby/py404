@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py404"
-version = "0.1.0"
+version = "0.1.1"
 description = "py404 is a CLI tool for finding deadlinks on a website."
 license = "MIT"
 authors = ["WillDenby <119456795+WillDenby@users.noreply.github.com>"]
