@@ -493,6 +493,20 @@ files = [
 ]
 
 [[package]]
+name = "pythonads"
+version = "0.1.0"
+description = "A sustainable, terminal-based ad network, passing 90% of revenues through to developers."
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "pythonads-0.1.0-py3-none-any.whl", hash = "sha256:e3d6116c84c9ef324ab042df750e33759401e46808c0f7748753bfc51a1da96c"},
+    {file = "pythonads-0.1.0.tar.gz", hash = "sha256:d8128667924dcf6675a3782e4f48ff4cf75793bdf73223534ee6d760a0a85b26"},
+]
+
+[package.dependencies]
+requests = ">=2.31.0,<3.0.0"
+
+[[package]]
 name = "requests"
 version = "2.31.0"
 description = "Python HTTP for Humans."
@@ -679,4 +693,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "5080eb446ae7b5a5c5b041aa2c22e4a6dd92a6893bb95f58900bb96999a2830c"
+content-hash = "11ccef977c74ecc757d6c05d9e7c51aab564bca4b6fe7099155314e3a42e61e1"

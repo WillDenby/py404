@@ -1,3 +1,4 @@
+import pythonads
 import typer
 from typing_extensions import Annotated
 import requests
