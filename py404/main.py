@@ -1,160 +1,65 @@
 import typer
 from typing_extensions import Annotated
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-from urllib3.exceptions import InsecureRequestWarning
-import asyncio
 import aiohttp
+import asyncio
+from bs4 import BeautifulSoup
 import csv
+from urllib.parse import urljoin, urlparse
 
 app = typer.Typer()
 
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-
-def find_pages(root_url):
-    visited_urls = set()
-    urls_to_visit = [root_url]
-
-    while urls_to_visit:
-        url = urls_to_visit.pop(0)
-
-        # Skip if already visited
-        if url in visited_urls:
-            continue
-
-        print("Page found:", url)
-
-        try:
-            response = requests.get(url, verify=False)
-        except requests.exceptions.RequestException as e:
-            print("Failed to crawl:", url, "Error:", e)
-            continue
-
-        # Add current URL to visited set
-        visited_urls.add(url)
-
-        # Parse HTML content
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Extract all links from the page
-        links = soup.find_all('a', href=True)
-        for link in links:
-            href = link['href']
-            # Construct absolute URL if relative
-            absolute_url = urljoin(url, href)
-            # Add to list if it's from the same domain and not already visited
-            if absolute_url.startswith(root_url) and absolute_url not in visited_urls:
-                urls_to_visit.append(absolute_url)
-
-    return visited_urls
-
-def find_links(page):
-    print("Finding links on:", page)
-    links_to_check = set()
+async def fetch(url, session):
     try:
-        response = requests.get(page, verify=False)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        for tag in soup.find_all('a', href=True):
-            link = tag['href']
-            if link.startswith('#'):
-                links_to_check.add(urljoin(page, link))
-            elif urlparse(link).netloc == '':
-                links_to_check.add(urljoin(page, link))
-            else:
-                links_to_check.add(link)
-
-        for tag in soup.find_all(['img', 'video', 'audio', 'source']):
-            src = tag.get('src')
-            if src:
-                links_to_check.add(urljoin(page, src))
-
-        for tag in soup.find_all('link', rel=True):
-            rel_values = tag.get('rel', [])
-            href = tag.get('href')
-            if 'stylesheet' in rel_values:
-                links_to_check.add(urljoin(page, href))
-            elif 'font' in rel_values:
-                links_to_check.add(urljoin(page, href))
-            elif 'icon' in rel_values:
-                links_to_check.add(urljoin(page, href))
-
-        for tag in soup.find_all('script', src=True):
-            src = tag.get('src')
-            if src:
-                links_to_check.add(urljoin(page, src))
-
-        for tag in soup.find_all(['a', 'link', 'script'], href=True):
-            href = tag.get('href')
-            if href.endswith('.xml'):
-                links_to_check.add(urljoin(page, href))
-            elif href.endswith(('.csv', '.json', '.xml')):
-                links_to_check.add(urljoin(page, href))
-            elif any(href.endswith(ext) for ext in ('.pdf', '.doc', '.docx', '.zip')):
-                links_to_check.add(urljoin(page, href))
-            elif href.startswith('http') or href.startswith('//'):
-                links_to_check.add(urljoin(page, href))
-
-        for tag in soup.find_all(['form'], action=True):
-            action = tag.get('action')
-            if action.startswith('http'):
-                links_to_check.append(urljoin(page, action))
-
+        async with session.get(url) as response:
+            return await response.text(), response.status
     except Exception as e:
-        print("Error:", e)
+        return str(e), 404
 
-    return links_to_check
+async def parse(url, session, base_domain, crawled, results):
+    text, status = await fetch(url, session)
+    if status == 200:
+        soup = BeautifulSoup(text, 'html.parser')
+        for link in soup.find_all('a', href=True):
+            link_url = urljoin(url, link['href'])
+            # Check if the link is within the same domain and not already crawled
+            if urlparse(link_url).netloc == base_domain and link_url not in crawled:
+                crawled.add(link_url)
+                # Recursively parse the new link
+                await parse(link_url, session, base_domain, crawled, results)
+            elif link_url not in crawled:
+                # If it's an external link, just check if it's broken without further crawling
+                _, status = await fetch(link_url, session)
+                if status == 404:
+                    if link_url not in results:
+                        results[link_url] = set()
+                    results[link_url].add(url)
+    elif status == 404:
+        if url not in results:
+            results[url] = set()
+        results[url].add(url)
 
-async def check_link(session, link):
-    print("Checking link:", link)
-    try:
-        async with session.get(link, verify_ssl=False) as response:
-            if response.status == 404:
-                return False
-            else:
-                return True
-    except Exception as e:
-        print(f"Exception occurred for {link}: {e}")
-        return True
-    
-async def find_deadlinks(links_to_check):
-    deadlinks = set()
+async def crawl(base_url):
+    crawled = set([base_url])
+    results = {}
     async with aiohttp.ClientSession() as session:
-        tasks = []
-        for link in links_to_check:
-            task = check_link(session, link)
-            tasks.append(task)
-        results = await asyncio.gather(*tasks)
-        for link, result in zip(links_to_check, results):
-            if not result:
-                deadlinks.add(link)
+        await parse(base_url, session, urlparse(base_url).netloc, crawled, results)
+    return results
 
-    return deadlinks
+def dump_to_csv(bad_links, file_name="py404.csv"):
+    with open(file_name, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Bad Link', 'Found On'])
+        for link, pages in bad_links.items():
+            writer.writerow([link, '; '.join(pages)])
+
+async def py404(url):
+    bad_links = await crawl(url)
+    dump_to_csv(bad_links)
 
 @app.command()
 def main(url: str):
     """
     Find deadlinks for any given website URL  
     """
-    previously_discovered_links = set()
-    links_and_pages = {}
-    for page in find_pages(url):
-        newly_discovered_links = find_links(page) - previously_discovered_links
-        for link in newly_discovered_links:
-            links_and_pages[link] = page
-        previously_discovered_links.update(newly_discovered_links)
-
-    links_to_check = list(links_and_pages.keys())
-    discovered_deadlinks = asyncio.run(find_deadlinks(links_to_check))
-    deadlinks_with_pages = {key: links_and_pages[key] for key in discovered_deadlinks if key in links_and_pages}
-
-    csv_file = 'py404.csv'
-
-    with open(csv_file, 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Deadlink', 'Found on Page'])
-        for key, value in deadlinks_with_pages.items():
-            writer.writerow([key, value])
-
-    print(f"Deadlinks saved in CSV file '{csv_file}'.")
+    asyncio.run(py404(url))
+    print("Deadlinks saved in CSV file 'py404.csv'")
