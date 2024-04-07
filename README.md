@@ -1,6 +1,6 @@
 # py404
 
-py404 is a CLI tool for finding deadlinks on a website. It checks for 404s on all kinds of links: hrefs, imgs, scripts in <head>, etc. It was a fun way to learn some asyncio.
+py404 is a CLI tool for finding deadlinks on a website. It was a fun way to learn some asyncio.
 
 ## Installation
 
